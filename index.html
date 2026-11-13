@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0b0512">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="format-detection" content="telephone=no">
+<meta name="description" content="Una sorpresa especial para ti 💕">
+<title>Para ti ♥</title>
+<style>
+:root{--safe-top:env(safe-area-inset-top,0px);--safe-right:env(safe-area-inset-right,0px);--safe-bottom:env(safe-area-inset-bottom,0px)}
+*,*::before,*::after{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{position:fixed;inset:0;width:100%;height:100%;margin:0;overflow:hidden;background:#0b0512;overscroll-behavior:none;touch-action:none;-webkit-user-select:none;user-select:none;font-family:Georgia,"Times New Roman",serif}
+#lienzo{position:fixed;inset:0;display:block;width:100%;height:100%;touch-action:none}
+.controles{position:fixed;top:calc(16px + var(--safe-top));right:calc(16px + var(--safe-right));z-index:10;display:flex;gap:8px;pointer-events:none}
+.boton{pointer-events:auto;font:14px Georgia,"Times New Roman",serif;color:#fff0f7;background:rgba(20,8,32,.7);border:1px solid rgba(255,143,190,.5);border-radius:999px;padding:10px 16px;min-height:44px;min-width:44px;cursor:pointer;touch-action:manipulation;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);transition:border-color .2s,background .2s,transform .1s,opacity .2s}
+.boton:active{transform:scale(.95);border-color:#ff8fbe}
+.boton:focus-visible{outline:2px solid #fff0f7;outline-offset:3px}
+.boton[aria-pressed="true"]{background:rgba(255,143,190,.3);border-color:#ff8fbe}
+.boton:disabled{opacity:.5;cursor:not-allowed}
+@keyframes pulsoAtencion{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(255,143,190,.7)}50%{transform:scale(1.06);box-shadow:0 0 0 12px rgba(255,143,190,0)}}
+.boton.atencion{animation:pulsoAtencion 1.8s ease-out infinite}
+#portada{position:fixed;inset:0;z-index:20;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:24px;text-align:center;cursor:pointer;color:#fff0f7;background:radial-gradient(circle at 50% 35%,#4a1d5e,#0b0512 70%);transition:opacity .8s ease}
+#portada.oculta{opacity:0;pointer-events:none}
+#portada .latido{font-size:72px;line-height:1;color:#ff6fa0;text-shadow:0 0 30px #ff3d86;animation:latido 1.3s ease-in-out infinite}
+#portada p{margin:0;font-style:italic;font-size:clamp(18px,5vw,26px);line-height:1.4}
+#portada .boton{font-size:17px;padding:14px 28px}
+@keyframes latido{0%,100%{transform:scale(1)}15%{transform:scale(1.18)}30%{transform:scale(1)}45%{transform:scale(1.12)}}
+@media (prefers-reduced-motion:reduce){.boton{transition:none}.boton.atencion,#portada .latido{animation:none}}
+</style>
+</head>
+<body>
+
+<canvas id="lienzo" role="img" aria-label="Animación romántica con mensajes para ti"></canvas>
+
+<nav class="controles" aria-label="Controles">
+  <button id="btnMusica" class="boton" type="button" aria-label="Reproducir o pausar música" aria-pressed="false">♪ Música</button>
+  <button id="btnPantalla" class="boton" type="button" aria-label="Pantalla completa" title="Pantalla completa">⛶</button>
+</nav>
+
+<div id="portada">
+  <div class="latido" aria-hidden="true">♥</div>
+  <p>Hay algo especial para ti…</p>
+  <button id="btnAbrir" class="boton atencion" type="button">Toca para abrir 💌</button>
+</div>
+
+<audio id="audio" src="cancion.mp3" loop preload="auto"></audio>
+
+<script>
+'use strict';
+
+/* ============================================================
+   1) FRASES — edítalas a tu gusto. TODAS se muestran, en orden.
+   ============================================================ */
+const FRASES_OSITO = [
+  "Llegaste justo cuando me había rendido de buscar el amor.",
+  "Contigo, todo se siente como en casa.",
+  "Te amo más cada día que pasa.",
+  "Gracias por llegar a mi vida y quedarte.",
+  "Eres mi lugar favorito en el mundo.",
+  "Cuando dejé de buscar, apareciste tú.",
+  "No te busqué, te encontré; y ahora no quiero perderte.",
+  "Eres la casualidad más bonita de mi vida.",
+  "No creía en el amor hasta que llegaste tú."
+];
+const FRASES_AVION = ["Te amo","Eres mi cielo","Te adoro","Mi corazón es tuyo","Eres mi todo","Mi para siempre","Eres mi universo"];
+const FRASES_CARTA = [
+  "Cada día contigo es mi historia favorita. Gracias por llegar a mi vida y quedarte en ella.",
+  "Te escribo esto para recordarte lo mucho que te amo, hoy y siempre.",
+  "Eres lo más bonito que me ha pasado. No cambiaría ni un solo momento a tu lado.",
+  "Cuando me rendí de buscar un verdadero amor, apareciste tú. Y ahora sé que quiero pasar toda mi vida contigo.",
+  "No sé qué habrá en el futuro, pero sé que quiero que estés en él. Te amo con todo mi corazón.",
+  "Antes de ti todo era distinto. Después de ti, todo tiene sentido. Gracias por existir.",
+  "Eres mi persona favorita, mi calma y mi tormenta. Y te amo en cada versión tuya.",
+  "No sé qué hice para merecerte, pero prometo cuidarte cada día de mi vida.",
+  "Mi lugar favorito en el mundo es a tu lado. Y mi futuro tiene tu nombre escrito."
+];
+const PALABRAS_BURBUJAS = ["Te amo","Mi amor","Bonita","Mi vida","Contigo","Siempre","Mi sol","Mi todo","Mi universo","Mi paz","Mi persona","Mi futuro"];
+const FRASES_BURBUJAS = [
+  "Eres mi todo, siempre.",
+  "Contigo, cada momento es especial.",
+  "Mi lugar favorito en el mundo eres tú.",
+  "Gracias por llegar cuando más lo necesitaba.",
+  "Eres la razón por la que creo en el amor.",
+  "Quiero pasar el resto de mi vida a tu lado."
+];
+const FRASES_AMANECER = [
+  "Buenos días, mi amor. Cada mañana quiero despertar contigo.",
+  "Eres mi sol favorito, el que sale cada mañana.",
+  "Un nuevo día, y sigo eligiéndote a ti.",
+  "Amanece, y lo primero que pienso eres tú.",
+  "Cada mañana contigo es un regalo.",
+  "Contigo, quiero envejecer viendo amanecer."
+];
+const FRASES_LUNA = [
+  "Eres la luna que ilumina mis noches oscuras.",
+  "Contigo hasta las estrellas se ven más bonitas.",
+  "Bajo la misma luna, mi corazón siempre te busca.",
+  "Eres mi universo entero, mi amor.",
+  "Eres mi para siempre, mi última y única persona."
+];
+const FRASES_JARDIN = [
+  "Nuestro amor florece cada día más.",
+  "Sembraste algo en mi corazón y hoy florece.",
+  "Contigo hasta los días grises tienen flores.",
+  "Eres el jardín donde mi corazón descansa.",
+  "Lo que siento por ti crece cada día."
+];
+const FRASES_FUEGOS = [
+  "Cada día a tu lado es una celebración.",
+  "Eres mi fuego, mi luz, mi todo.",
+  "Por ti, celebraría cada día de mi vida.",
+  "Contigo, hasta lo ordinario es mágico.",
+  "Eres mi motivo para celebrar."
+];
+
+/* ============================================================
+   2) UTILIDADES
+   ============================================================ */
+const TAU = Math.PI * 2;
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const lerp = (a, b, k) => a + (b - a) * k;
+const frac = v => v - Math.floor(v);
+const easeOut = x => 1 - Math.pow(1 - x, 3);
+const easeInOut = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const pulso = t => { const f = (t % .9) / .9; return Math.exp(-Math.pow((f - .06) / .05, 2)) + .6 * Math.exp(-Math.pow((f - .3) / .07, 2)); };
+const hexRgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+const mezcla = (a, b, k) => { const A = hexRgb(a), B = hexRgb(b); return `rgb(${A.map((v, i) => Math.round(lerp(v, B[i], k))).join(',')})`; };
+
+/* ============================================================
+   3) CANVAS (se adapta a la pantalla del celular)
+   ============================================================ */
+const lienzo = document.getElementById('lienzo');
+const ctx = lienzo.getContext('2d', { alpha: false });
+let W, H, DPR, U, DPR_MAX = 2, SAFE_BOTTOM = 0;
+
+function ajustar() {
+  DPR = Math.min(window.devicePixelRatio || 1, DPR_MAX);
+  W = window.innerWidth; H = window.innerHeight;
+  lienzo.width = Math.floor(W * DPR); lienzo.height = Math.floor(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  U = Math.min(W, H);
+  SAFE_BOTTOM = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--safe-bottom')) || 0;
+}
+let rt;
+const reajustar = () => { clearTimeout(rt); rt = setTimeout(ajustar, 150); };
+window.addEventListener('resize', reajustar, { passive: true });
+window.addEventListener('orientationchange', reajustar, { passive: true });
+ajustar();
+
+/* ============================================================
+   4) SECUENCIADOR DE FRASES
+   Cada escena muestra TODAS sus frases, una tras otra.
+   ============================================================ */
+let escena = 0, s = 0, duracionEscenaActual = 10;
+
+// Velocidad de lectura: segundos por frase = SEG_BASE + letras × SEG_LETRA
+const SEG_BASE = 2.4, SEG_LETRA = .055;
+const durFrase = f => clamp(SEG_BASE + f.length * SEG_LETRA, 3.2, 8);
+
+// Devuelve la frase vigente: { txt, a: opacidad, t: segundos desde que apareció }
+function frase(lista, ini, tt) {
+  let t = tt - ini;
+  if (t < 0) return null;
+  const ult = lista.length - 1;
+  for (let i = 0; i <= ult; i++) {
+    const d = durFrase(lista[i]);
+    if (t < d || i === ult) {
+      const entra = easeOut(clamp(t / .9, 0, 1));
+      const sale = i === ult ? 1 : clamp((d - t) / .7, 0, 1);
+      return { txt: lista[i], a: Math.min(entra, sale), t };
+    }
+    t -= d;
+  }
+}
+
+/* ============================================================
+   5) PRIMITIVAS DE DIBUJO
+   ============================================================ */
+const cir = (x, y, r) => { ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill(); };
+const eli = (x, y, a, b, rot = 0) => { ctx.beginPath(); ctx.ellipse(x, y, a, b, rot, 0, TAU); ctx.fill(); };
+const tri = (a, b, c, d, e, f) => { ctx.beginPath(); ctx.moveTo(a, b); ctx.lineTo(c, d); ctx.lineTo(e, f); ctx.fill(); };
+
+function fondoV(stops) {
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  stops.forEach(([p, c]) => g.addColorStop(p, c));
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+}
+
+function corazon(x, y, r, c1, c2) {
+  ctx.save(); ctx.translate(x, y);
+  const g = ctx.createRadialGradient(-r * .25, -r * .3, r * .05, 0, 0, r * .75);
+  g.addColorStop(0, c1); g.addColorStop(1, c2);
+  ctx.beginPath(); ctx.moveTo(0, r * .35);
+  ctx.bezierCurveTo(-r * .6, -r * .2, -r * .5, -r * .85, 0, -r * .4);
+  ctx.bezierCurveTo(r * .5, -r * .85, r * .6, -r * .2, 0, r * .35);
+  ctx.fillStyle = g; ctx.fill(); ctx.restore();
+}
+
+function rectRedondeado(x, y, w, h, r) {
+  ctx.beginPath(); ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+
+function escribirTexto(str, x, y, fs, color, glow) {
+  ctx.font = `italic ${fs}px Georgia, "Times New Roman", serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.shadowColor = glow; ctx.shadowBlur = fs * .8 * DPR;
+  ctx.fillStyle = color; ctx.fillText(str, x, y);
+  ctx.shadowBlur = 0;
+}
+
+function envolver(str, maxW, fs) {
+  ctx.font = `italic ${fs}px Georgia, "Times New Roman", serif`;
+  const res = []; let l = '';
+  for (const p of str.split(' ')) {
+    const prueba = l ? l + ' ' + p : p;
+    if (l && ctx.measureText(prueba).width > maxW) { res.push(l); l = p; } else l = prueba;
+  }
+  if (l) res.push(l);
+  return res;
+}
+
+// Frase actual de la escena, centrada, con salida/entrada suave
+function bloque(lista, ini, tt, ancho, fsK, fmin, fmax, y, centrar, color, glow, lh) {
+  const fr = frase(lista, ini, tt);
+  if (!fr) return;
+  const fs = clamp(U * fsK, fmin, fmax), ls = envolver(fr.txt, W * ancho, fs);
+  ctx.globalAlpha = fr.a;
+  ls.forEach((l, i) => escribirTexto(l, W / 2, y + (i - (centrar ? (ls.length - 1) / 2 : 0)) * fs * lh, fs, color, glow));
+  ctx.globalAlpha = 1;
+}
+
+function estrellas(tt, n, alfa) {
+  ctx.fillStyle = '#fff';
+  for (let i = 0; i < n; i++) {
+    const x = frac(Math.sin(i * 91.7) * 43758.5) * W, y = frac(Math.sin(i * 27.3 + 3) * 12345.6) * H * .75;
+    ctx.globalAlpha = alfa * (.35 + .65 * (.5 + .5 * Math.sin(tt * 2 + i)));
+    cir(x, y, .8 + (i % 3) * .4);
+  }
+  ctx.globalAlpha = 1;
+}
+
+/* ============================================================
+   6) ESCENAS
+   ============================================================ */
+function osito(tt) {
+  const cx = W / 2, R = U * .12, by = H * .4 + Math.sin(tt * 1.6) * R * .08;
+  fondoV([[0, '#2a1244'], [1, '#6b2f6e']]);
+  estrellas(tt, 60, .7);
+  const pelo = ctx.createRadialGradient(cx - R * .35, by - R * .3, R * .2, cx, by, R * 1.4);
+  pelo.addColorStop(0, '#e6aa74'); pelo.addColorStop(1, '#a8623a');
+  ctx.fillStyle = pelo;
+  eli(cx, by + R * 1.9, R * .9, R); eli(cx - R * .55, by + R * 2.85, R * .34, R * .24); eli(cx + R * .55, by + R * 2.85, R * .34, R * .24);
+  ctx.fillStyle = '#f5dcc0'; eli(cx, by + R * 2.05, R * .5, R * .6);
+  ctx.fillStyle = pelo; eli(cx - R * .8, by + R * 1.55, R * .3, R * .52, -.5); eli(cx + R * .8, by + R * 1.55, R * .3, R * .52, .5);
+  corazon(cx, by + R * 1.45, R * .5 * (1 + .12 * pulso(tt)), '#ff9ccb', '#d1306c');
+  ctx.fillStyle = '#b8743f'; cir(cx - R * .72, by - R * .72, R * .36); cir(cx + R * .72, by - R * .72, R * .36);
+  ctx.fillStyle = '#f4a3b8'; cir(cx - R * .72, by - R * .72, R * .2); cir(cx + R * .72, by - R * .72, R * .2);
+  const cab = ctx.createRadialGradient(cx - R * .35, by - R * .4, R * .2, cx, by, R * 1.1);
+  cab.addColorStop(0, '#e9b07c'); cab.addColorStop(1, '#a8623a');
+  ctx.fillStyle = cab; cir(cx, by, R);
+  ctx.fillStyle = '#f5dcc0'; eli(cx, by + R * .36, R * .46, R * .34);
+  ctx.fillStyle = '#3d2418'; eli(cx, by + R * .2, R * .14, R * .1);
+  ctx.strokeStyle = '#3d2418'; ctx.lineWidth = Math.max(1.5, R * .05); ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(cx - R * .16, by + R * .36);
+  ctx.quadraticCurveTo(cx - R * .08, by + R * .48, cx, by + R * .3);
+  ctx.quadraticCurveTo(cx + R * .08, by + R * .48, cx + R * .16, by + R * .36); ctx.stroke();
+  const parp = (tt % 3.5) < .14 ? .15 : 1;
+  for (const sx of [-1, 1]) {
+    ctx.fillStyle = '#2a170f'; eli(cx + sx * R * .38, by - R * .12, R * .12, R * .12 * parp);
+    if (parp > .5) { ctx.fillStyle = '#fff'; cir(cx + sx * R * .42, by - R * .17, R * .035); }
+  }
+  ctx.fillStyle = 'rgba(255,120,160,.55)';
+  for (const sx of [-1, 1]) eli(cx + sx * R * .62, by + R * .22, R * .14, R * .09);
+  for (let k = 0; k < 7; k++) {
+    const ph = frac(tt * .45 + k / 7), x = cx + Math.sin(k * 2.1 + tt * 2) * R * .9 + (k - 3) * R * .12, y = by + R * 1.2 - ph * U * .5;
+    const col = `rgba(255,150,200,${(1 - ph).toFixed(3)})`;
+    corazon(x, y, R * (.12 + .05 * (k % 3)), col, col);
+  }
+  const tb = tt - 1.2;
+  if (tb > 0) {
+    const pop = easeOut(clamp(tb / .35, 0, 1)), palabra = 'Te amo', fs = R * .36;
+    ctx.font = `italic ${fs}px Georgia, "Times New Roman", serif`;
+    const an = ctx.measureText(palabra).width + R * .7;
+    const bx = clamp(cx + R * 1.6, an / 2 + 8, W - an / 2 - 8), byy = by - R * 2.3;
+    ctx.save(); ctx.translate(bx, byy); ctx.scale(pop, pop);
+    ctx.fillStyle = '#fff6fa'; ctx.strokeStyle = '#ff8fbe'; ctx.lineWidth = 2;
+    rectRedondeado(-an / 2, -fs * .8, an, fs * 1.6, fs * .6); ctx.fill(); ctx.stroke();
+    tri(-an * .3, fs * .8, -an * .4, fs * 1.5, -an * .1, fs * .8);
+    escribirTexto(palabra.slice(0, Math.floor(clamp(tb * 9, 0, palabra.length))), 0, 0, fs, '#5a1c3c', 'rgba(255,120,190,.6)');
+    ctx.restore();
+  }
+  bloque(FRASES_OSITO, 3.8, tt, .86, .045, 18, 30, by + R * 3.7, false, '#fff0f7', 'rgba(255,120,190,.9)', 1.35);
+}
+
+function avion(tt) {
+  const cx = W / 2, cy = H * .48, sc = U * .4 / 32;
+  fondoV([[0, '#6fa8ff'], [.6, '#f7c6dd'], [1, '#ffe0ec']]);
+  ctx.fillStyle = 'rgba(255,255,255,.8)';
+  for (let i = 0; i < 5; i++) {
+    const x = frac(i * .23 + tt * .012) * (W + 300) - 150, y = H * (.12 + .12 * (i % 4));
+    eli(x, y, U * .12, U * .04); eli(x + U * .08, y - U * .02, U * .08, U * .05);
+  }
+  const X = a => cx + 16 * Math.pow(Math.sin(a), 3) * sc;
+  const Y = a => cy - (13 * Math.cos(a) - 5 * Math.cos(2 * a) - 2 * Math.cos(3 * a) - Math.cos(4 * a) + 2.5) * sc;
+  const a0 = Math.PI, a1 = a0 + easeInOut(clamp((tt - .8) / 5.2, 0, 1)) * TAU;
+  ctx.beginPath();
+  for (let i = 0; i <= 160; i++) { const a = a0 + (a1 - a0) * i / 160; i ? ctx.lineTo(X(a), Y(a)) : ctx.moveTo(X(a), Y(a)); }
+  ctx.strokeStyle = 'rgba(255,255,255,.95)'; ctx.lineWidth = 3.5; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.shadowColor = 'rgba(255,90,160,.9)'; ctx.shadowBlur = 16 * DPR; ctx.stroke(); ctx.shadowBlur = 0;
+  const dx = 48 * Math.pow(Math.sin(a1), 2) * Math.cos(a1) * sc;
+  const dy = (-13 * Math.sin(a1) + 10 * Math.sin(2 * a1) + 6 * Math.sin(3 * a1) + 4 * Math.sin(4 * a1)) * sc;
+  const u = U * .022;
+  ctx.save(); ctx.translate(X(a1), Y(a1)); ctx.rotate(Math.atan2(-dy, dx));
+  ctx.fillStyle = '#fff'; eli(0, 0, u * 1.2, u * .3);
+  ctx.fillStyle = '#ffd1e4';
+  tri(u * .2, 0, -u * .3, -u * 1.1, -u * .5, 0); tri(u * .2, 0, -u * .3, u * 1.1, -u * .5, 0); tri(-u, 0, -u * 1.4, -u * .5, -u * 1.4, u * .5);
+  ctx.restore();
+  const fr = frase(FRASES_AVION, 6.2, tt);
+  if (fr) {
+    ctx.globalAlpha = fr.a;
+    escribirTexto(fr.txt, cx, cy, clamp(U * .08, 28, 56), '#fff', 'rgba(255,90,160,.95)');
+    ctx.globalAlpha = 1;
+  }
+}
+
+function carta(tt) {
+  const cx = W / 2, cy = H * .5;
+  const f = ctx.createRadialGradient(cx, H * .25, 0, cx, cy, U * 1.2);
+  f.addColorStop(0, '#5a2b3a'); f.addColorStop(1, '#170a12');
+  ctx.fillStyle = f; ctx.fillRect(0, 0, W, H);
+  const ew = Math.min(W * .68, U * 1.05), eh = ew * .62, ex = cx - ew / 2, ey = cy - eh / 2;
+  const aparece = easeOut(clamp(tt, 0, 1)), abre = easeInOut(clamp((tt - 2.4) / 1.2, 0, 1));
+  const cosF = Math.cos(abre * Math.PI), delante = cosF >= 0;
+  const solapa = () => {
+    ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(ex + ew, ey); ctx.lineTo(cx, ey + eh * .55 * cosF); ctx.closePath();
+    ctx.fillStyle = delante ? '#ffd3e2' : '#f5b3c9'; ctx.fill();
+    ctx.strokeStyle = '#f0c3d0'; ctx.lineWidth = 1.5; ctx.stroke();
+  };
+  ctx.globalAlpha = aparece;
+  ctx.shadowColor = 'rgba(0,0,0,.45)'; ctx.shadowBlur = 30 * DPR;
+  ctx.fillStyle = '#ffe9ef'; ctx.fillRect(ex, ey, ew, eh); ctx.shadowBlur = 0;
+  ctx.strokeStyle = '#f0c3d0'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(ex, ey + eh); ctx.lineTo(cx, ey + eh * .5); ctx.lineTo(ex + ew, ey + eh); ctx.stroke();
+  if (!delante) solapa();
+  const q = easeInOut(clamp((tt - 3.4) / 1.6, 0, 1)), Lh = Math.min(H * .8, 620), Lw = Math.min(W * .84, Lh * .8);
+  const lw = lerp(ew * .86, Lw, q), lh = lerp(eh * .92, Lh, q);
+  const lcy = lerp(cy + eh * .04, cy - (Lh - eh) * .12, q), lx = cx - lw / 2, ly = lcy - lh / 2;
+  ctx.fillStyle = '#fffaf6'; ctx.shadowColor = 'rgba(0,0,0,.35)'; ctx.shadowBlur = 20 * DPR;
+  rectRedondeado(lx, ly, lw, lh, 6); ctx.fill(); ctx.shadowBlur = 0;
+  const fr = frase(FRASES_CARTA, 4.8, tt);
+  if (fr) {
+    const fs = clamp(lw * .06, 13, 24), lineas = ['Mi amor,', ...envolver(fr.txt, lw * .8, fs), 'Siempre tuyo.'];
+    let n = Math.floor(fr.t * 26), y = ly + lh * .14 + fs;
+    ctx.font = `italic ${fs}px Georgia, "Times New Roman", serif`;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = `rgba(90,42,64,${fr.a.toFixed(3)})`;
+    for (const l of lineas) {
+      const v = l.slice(0, Math.max(0, n)); n -= l.length;
+      if (v) ctx.fillText(v, lx + lw * .1, y);
+      y += fs * 1.5;
+    }
+  }
+  if (delante) solapa();
+  const sello = (1 - clamp((tt - 2.2) / .4, 0, 1)) * aparece;
+  if (sello > 0) { ctx.globalAlpha = sello; corazon(cx, ey + eh * .5, U * .04 * (1 + .08 * pulso(tt)), '#ff6fa0', '#b8124f'); }
+  ctx.globalAlpha = 1;
+}
+
+function burbujas(tt) {
+  fondoV([[0, '#2b1452'], [1, '#8a3f7a']]);
+  estrellas(tt, 40, .5);
+  for (let i = 0; i < 12; i++) {
+    const r = U * (.05 + .04 * frac(Math.sin(i * 7.1) * 9999)), x0 = frac(Math.sin(i * 12.9 + 1) * 4375.5) * W;
+    const vel = H * (.06 + .05 * frac(Math.sin(i * 3.7) * 1234.5)), fase = frac(Math.sin(i * 5.3) * 999.1), rango = H + 2 * r;
+    const y = H + r - frac(fase + vel * tt / rango) * rango, x = x0 + Math.sin(tt * 1.3 + i) * r * .5;
+    const alfa = clamp((y - H * .08) / (H * .12), 0, 1);
+    if (alfa <= 0) continue;
+    ctx.globalAlpha = alfa;
+    const g = ctx.createRadialGradient(x - r * .3, y - r * .3, r * .1, x, y, r);
+    g.addColorStop(0, 'rgba(255,255,255,.08)'); g.addColorStop(.75, 'rgba(255,170,230,.22)'); g.addColorStop(1, 'rgba(190,230,255,.55)');
+    ctx.fillStyle = g; cir(x, y, r);
+    ctx.strokeStyle = 'rgba(255,255,255,.6)'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.beginPath(); ctx.arc(x, y, r * .8, Math.PI * 1.1, Math.PI * 1.45); ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.stroke();
+    escribirTexto(PALABRAS_BURBUJAS[i % PALABRAS_BURBUJAS.length], x, y, Math.max(10, r * .32), '#fff', 'rgba(255,120,190,.8)');
+  }
+  ctx.globalAlpha = 1;
+  bloque(FRASES_BURBUJAS, 3.2, tt, .8, .05, 20, 34, H * .5, true, '#fff5fa', 'rgba(255,120,190,.95)', 1.35);
+}
+
+function amanecer(tt, p) {
+  const cx = W / 2, hor = H * .72;
+  fondoV([[0, mezcla('#15123a', '#ff9bb0', p)], [.7, mezcla('#2a1c55', '#ffc4a8', p)], [1, mezcla('#1b1030', '#ffd3a1', p)]]);
+  estrellas(tt, 70, 1 - p);
+  const sol = easeInOut(clamp(p / .75, 0, 1)), sy = lerp(hor + U * .25, hor - U * .3, sol), sr = U * .085;
+  const halo = ctx.createRadialGradient(cx, sy, sr * .5, cx, sy, U * .6);
+  halo.addColorStop(0, 'rgba(255,230,170,.6)'); halo.addColorStop(1, 'rgba(255,230,170,0)');
+  ctx.fillStyle = halo; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#fff1b8'; cir(cx, sy, sr);
+  for (const c of [{ y: hor, amp: U * .03, f: .006, ph: 0, col: '#7a3d7e' }, { y: hor + U * .08, amp: U * .04, f: .009, ph: 2, col: '#4a2060' }]) {
+    ctx.beginPath(); ctx.moveTo(0, H);
+    for (let x = 0; x <= W; x += 12) ctx.lineTo(x, c.y + Math.sin(x * c.f + c.ph) * c.amp);
+    ctx.lineTo(W, H); ctx.closePath(); ctx.fillStyle = c.col; ctx.fill();
+  }
+  ctx.strokeStyle = 'rgba(60,20,60,.75)'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+  for (let i = 0; i < 6; i++) {
+    const x = frac(i * .173 + tt * .02) * (W + 120) - 60, y = H * (.22 + .05 * (i % 3)) + Math.sin(tt + i) * 6;
+    const f = Math.sin(tt * 9 + i) * .5, b = U * .02 * (.8 + .2 * (i % 2));
+    ctx.beginPath(); ctx.moveTo(x - b, y - b * f);
+    ctx.quadraticCurveTo(x - b * .4, y - b * .2, x, y); ctx.quadraticCurveTo(x + b * .4, y - b * .2, x + b, y - b * f); ctx.stroke();
+  }
+  bloque(FRASES_AMANECER, 4, tt, .84, .05, 18, 32, H * .2, false, '#fff9f2', 'rgba(90,30,80,.55)', 1.4);
+}
+
+function luna(tt) {
+  const cx = W / 2, cy = H * .35;
+  fondoV([[0, '#0a0a2e'], [.5, '#1a1a4a'], [1, '#2a1a3e']]);
+  estrellas(tt, 120, .9);
+  for (let i = 0; i < 3; i++) {
+    const ph = frac(tt * .15 + i / 3); if (ph > .3) continue;
+    const x0 = W * (.2 + .6 * frac(Math.sin(i * 3.7) * 9999)), t = ph / .3, x = x0 + t * W * .4, y = H * .08 + t * H * .4;
+    ctx.globalAlpha = 1 - t;
+    const g = ctx.createLinearGradient(x - U * .08, y - U * .08, x, y);
+    g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(1, 'rgba(255,200,230,.9)');
+    ctx.strokeStyle = g; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x - U * .08, y - U * .08); ctx.lineTo(x, y); ctx.stroke();
+    ctx.fillStyle = '#fff'; cir(x, y, 2); ctx.globalAlpha = 1;
+  }
+  const mr = U * .18, my = cy + Math.sin(tt * .5) * 5;
+  const halo = ctx.createRadialGradient(cx, my, mr * .9, cx, my, mr * 2.5);
+  halo.addColorStop(0, 'rgba(255,240,200,.4)'); halo.addColorStop(1, 'rgba(255,240,200,0)');
+  ctx.fillStyle = halo; cir(cx, my, mr * 2.5);
+  const mg = ctx.createRadialGradient(cx - mr * .3, my - mr * .3, mr * .1, cx, my, mr);
+  mg.addColorStop(0, '#fffbe8'); mg.addColorStop(1, '#e8d5a0');
+  ctx.fillStyle = mg; cir(cx, my, mr);
+  ctx.fillStyle = 'rgba(200,180,140,.5)';
+  for (const [a, b, c] of [[-.3, -.2, .15], [.2, .1, .1], [-.1, .35, .08], [.35, -.3, .07]]) cir(cx + a * mr, my + b * mr, c * mr);
+  for (let i = 0; i < 8; i++) {
+    const ph = frac(tt * .2 + i / 8), x = W * (.1 + .8 * frac(Math.sin(i * 7.3) * 9999)) + Math.sin(tt + i) * 20, y = H - ph * H * 1.1;
+    ctx.globalAlpha = Math.min(1, ph * 3) * (1 - ph) * .7; corazon(x, y, U * .02, '#ff9ccb', '#d1306c'); ctx.globalAlpha = 1;
+  }
+  bloque(FRASES_LUNA, 4, tt, .85, .045, 18, 32, H * .75, false, '#fff5fa', 'rgba(180,220,255,.9)', 1.4);
+}
+
+function jardin(tt) {
+  const suelo = H * .72;
+  fondoV([[0, '#fce4ec'], [.7, '#f8bbd0'], [1, '#2e5738']]);
+  const sg = ctx.createRadialGradient(W * .8, H * .15, 10, W * .8, H * .15, U * .4);
+  sg.addColorStop(0, 'rgba(255,240,180,.8)'); sg.addColorStop(1, 'rgba(255,240,180,0)');
+  ctx.fillStyle = sg; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#2e5738'; ctx.beginPath(); ctx.moveTo(0, H);
+  for (let x = 0; x <= W; x += 20) ctx.lineTo(x, suelo + Math.sin(x * .02) * 8);
+  ctx.lineTo(W, H); ctx.closePath(); ctx.fill();
+  const n = 8, cols = [['#ff9ccb', '#d1306c'], ['#ffb3ba', '#c94c8a'], ['#ffc8dd', '#e677aa']];
+  for (let i = 0; i < n; i++) {
+    const fx = W * (.1 + .8 * i / (n - 1)), baseY = suelo + Math.sin(fx * .02) * 8, alt = U * (.15 + .1 * frac(Math.sin(i * 3.7) * 9999));
+    const sway = Math.sin(tt * 1.5 + i) * 6, bloom = easeOut(clamp((tt - i * .3) / 1.2, 0, 1));
+    ctx.strokeStyle = '#4a7c59'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(fx, baseY);
+    ctx.quadraticCurveTo(fx + sway * .5, baseY - alt * .5, fx + sway, baseY - alt); ctx.stroke();
+    if (bloom > .3) { ctx.fillStyle = '#5a9c69'; eli(fx + sway * .3 - 8, baseY - alt * .4, 8, 4, -.5); eli(fx + sway * .6 + 8, baseY - alt * .6, 8, 4, .5); }
+    if (bloom > 0) { const c = cols[i % 3]; corazon(fx + sway, baseY - alt, U * .04 * bloom, c[0], c[1]); }
+  }
+  for (let i = 0; i < 3; i++) {
+    const bx = W * frac(i * .37 + tt * .04), by = H * (.3 + .2 * Math.sin(tt * 1.2 + i)), ala = Math.sin(tt * 8 + i) * .5 + .5;
+    ctx.fillStyle = `rgba(255,150,200,${.6 * ala + .2})`; eli(bx - 4, by, 4, 6, -.3); eli(bx + 4, by, 4, 6, .3);
+  }
+  bloque(FRASES_JARDIN, 4, tt, .85, .045, 18, 32, H * .15, false, '#7a2050', 'rgba(255,200,220,.9)', 1.4);
+}
+
+function fuegos(tt) {
+  fondoV([[0, '#0a0520'], [1, '#1a0a2e']]);
+  estrellas(tt, 80, .8);
+  const ciclo = 2.5, n = 4, cols = [['#ff6fa0', '#ffb6d5'], ['#ffc14d', '#ffe4a8'], ['#a36fff', '#d8c2ff'], ['#6fdcff', '#bcecff']];
+  for (let i = 0; i < n; i++) {
+    const tl = frac((tt + i * ciclo / n) / ciclo) * ciclo, sub = clamp(tl, 0, 1), ex = clamp((tl - 1) / 1.5, 0, 1);
+    const ix = W * (.2 + .6 * frac(Math.sin(i * 3.1) * 9999)), iy = H * .9;
+    const fx = W * (.2 + .6 * frac(Math.sin(i * 7.3) * 9999)), fy = H * (.2 + .15 * frac(Math.sin(i * 5.9) * 9999));
+    if (ex < 1) {
+      const cx = lerp(ix, fx, sub), cy = lerp(iy, fy, sub), s0 = Math.max(0, sub - .15);
+      ctx.fillStyle = '#fff'; cir(cx, cy, 3);
+      ctx.strokeStyle = 'rgba(255,255,255,.5)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(lerp(ix, fx, s0), lerp(iy, fy, s0)); ctx.lineTo(cx, cy); ctx.stroke();
+    }
+    if (ex > 0 && ex < 1) {
+      const rad = U * .2 * easeOut(ex), c = cols[i % 4];
+      ctx.globalAlpha = 1 - ex;
+      for (let j = 0; j < 12; j++) { const a = j / 12 * TAU; corazon(fx + Math.cos(a) * rad, fy + Math.sin(a) * rad + ex * ex * 30, U * .012 * (1 - ex * .5), c[0], c[1]); }
+      ctx.globalAlpha = 1;
+    }
+  }
+  bloque(FRASES_FUEGOS, 3, tt, .85, .05, 20, 36, H * .5, true, '#fff', 'rgba(255,120,190,.95)', 1.4);
+}
+
+/* ============================================================
+   7) ORDEN DE ESCENAS (ini = segundo en que sale la 1.ª frase)
+   ============================================================ */
+const ESCENAS = [
+  { d: osito,     frases: FRASES_OSITO,     ini: 3.8 },
+  { d: avion,     frases: FRASES_AVION,     ini: 6.2 },
+  { d: carta,     frases: FRASES_CARTA,     ini: 4.8 },
+  { d: burbujas,  frases: FRASES_BURBUJAS,  ini: 3.2 },
+  { d: amanecer,  frases: FRASES_AMANECER,  ini: 4 },
+  { d: luna,      frases: FRASES_LUNA,      ini: 4 },
+  { d: jardin,    frases: FRASES_JARDIN,    ini: 4 },
+  { d: fuegos,    frases: FRASES_FUEGOS,    ini: 3 }
+];
+const duracionDe = e => e.ini + e.frases.reduce((t, f) => t + durFrase(f), 0) + 1.2;
+
+function entrarEscena(n) {
+  escena = n % ESCENAS.length;
+  s = 0;
+  duracionEscenaActual = duracionDe(ESCENAS[escena]);
+}
+duracionEscenaActual = duracionDe(ESCENAS[0]);
+
+function dibujarPuntos() {
+  const n = ESCENAS.length, sep = 16, x0 = W / 2 - ((n - 1) * sep) / 2, y = H - 26 - SAFE_BOTTOM;
+  ctx.fillStyle = '#fff0f7';
+  for (let i = 0; i < n; i++) { ctx.globalAlpha = i === escena ? 1 : .35; cir(x0 + i * sep, y, i === escena ? 5 : 3.5); }
+  ctx.globalAlpha = 1;
+}
+
+/* ============================================================
+   8) BUCLE PRINCIPAL (espera a que se abra la portada)
+   ============================================================ */
+let ultimo = performance.now(), iniciado = false, muestras = 0, acum = 0;
+
+function frame(ahora) {
+  requestAnimationFrame(frame);
+  const bruto = ahora - ultimo;
+  ultimo = ahora;
+  if (!iniciado) return;
+
+  s += Math.min(.05, bruto / 1000);
+  if (s >= duracionEscenaActual) entrarEscena(escena + 1);
+
+  // Calidad adaptativa: si el celular va lento, baja la resolución
+  if (muestras < 90) {
+    acum += bruto;
+    if (++muestras === 90 && acum / 90 > 30 && DPR_MAX > 1) { DPR_MAX = 1; ajustar(); }
+  }
+
+  ctx.globalAlpha = 1;
+  ctx.clearRect(0, 0, W, H);
+  ESCENAS[escena].d(s, clamp(s / duracionEscenaActual, 0, 1));
+
+  const fundido = Math.max(clamp(1 - s / .7, 0, 1), clamp(1 - (duracionEscenaActual - s) / .7, 0, 1));
+  if (fundido > 0) { ctx.globalAlpha = fundido; ctx.fillStyle = '#0b0512'; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
+  dibujarPuntos();
+}
+requestAnimationFrame(frame);
+
+/* ============================================================
+   9) PORTADA + MÚSICA
+   Los celulares bloquean el audio hasta que la persona toca la
+   pantalla. Ese primer toque en la portada abre todo con música.
+   ============================================================ */
+const audio = document.getElementById('audio');
+const btnMusica = document.getElementById('btnMusica');
+const btnPantalla = document.getElementById('btnPantalla');
+const portada = document.getElementById('portada');
+let musicaFallida = false, pausadaPorUsuario = false;
+
+function actualizarBotonMusica() {
+  if (musicaFallida) {
+    btnMusica.textContent = '♪ Sin audio'; btnMusica.disabled = true;
+    btnMusica.setAttribute('aria-pressed', 'false');
+    return;
+  }
+  const suena = !audio.paused && !audio.ended;
+  btnMusica.textContent = suena ? '❚❚ Música' : '♪ Música';
+  btnMusica.classList.toggle('atencion', !suena && iniciado);
+  btnMusica.setAttribute('aria-pressed', String(suena));
+}
+
+function reproducirMusica() {
+  if (musicaFallida) return Promise.resolve(false);
+  return audio.play().then(() => true).catch(err => {
+    console.info('Audio bloqueado hasta el primer toque:', err?.name);
+    return false;
+  });
+}
+
+function iniciar() {
+  if (iniciado) return;
+  iniciado = true;
+  portada.classList.add('oculta');
+  activarWakeLock();
+  actualizarBotonMusica();
+}
+
+function pedirPantallaCompleta() {
+  const el = document.documentElement;
+  if (!document.fullscreenElement && el.requestFullscreen) el.requestFullscreen()?.catch?.(() => {});
+}
+
+audio.addEventListener('play', actualizarBotonMusica);
+audio.addEventListener('pause', actualizarBotonMusica);
+audio.addEventListener('error', () => {
+  musicaFallida = true;
+  console.warn('⚠️ No se pudo cargar "cancion.mp3". Debe estar en la MISMA carpeta que index.html, con ese nombre exacto en minúsculas.');
+  actualizarBotonMusica();
+});
+if (audio.error) musicaFallida = true;
+
+// 1) Intento de autoplay al cargar (a veces funciona en computadora)
+reproducirMusica().then(ok => { if (ok) iniciar(); });
+
+// 2) Toque en la portada: este gesto SÍ permite audio en iPhone y Android
+portada.addEventListener('click', () => {
+  reproducirMusica();   // debe llamarse dentro del gesto
+  iniciar();
+  pedirPantallaCompleta();
+});
+
+btnMusica.addEventListener('click', e => {
+  e.stopPropagation();
+  if (musicaFallida) return;
+  if (audio.paused) { pausadaPorUsuario = false; reproducirMusica(); }
+  else { pausadaPorUsuario = true; audio.pause(); }
+});
+
+// iPhone no permite pantalla completa en páginas web: se oculta el botón
+if (!document.documentElement.requestFullscreen) btnPantalla.hidden = true;
+btnPantalla.addEventListener('click', e => {
+  e.stopPropagation();
+  if (document.fullscreenElement) document.exitFullscreen(); else pedirPantallaCompleta();
+});
+document.addEventListener('fullscreenchange', () => {
+  btnPantalla.setAttribute('aria-pressed', document.fullscreenElement ? 'true' : 'false');
+});
+
+/* ============================================================
+   10) PANTALLA ENCENDIDA + REANUDAR AL VOLVER A LA APP
+   ============================================================ */
+let wakeLock = null;
+async function activarWakeLock() {
+  if (!('wakeLock' in navigator) || wakeLock) return;
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+    wakeLock.addEventListener('release', () => { wakeLock = null; });
+  } catch (err) { /* opcional */ }
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  ultimo = performance.now();
+  if (!iniciado) return;
+  activarWakeLock();
+  if (audio.paused && !pausadaPorUsuario && !musicaFallida) reproducirMusica();
+});
+</script>
+</body>
+</html>
